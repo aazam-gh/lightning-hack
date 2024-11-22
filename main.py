@@ -2,7 +2,6 @@ import streamlit as st
 import openai
 import base64
 from PIL import Image
-import io
 
 # Set page configuration
 st.set_page_config(
