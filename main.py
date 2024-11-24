@@ -1,11 +1,16 @@
 import streamlit as st
-import openai
-import base64
 from PIL import Image
+import assemblyai as aai
+from functions import encode_image_to_base64, analyze_image, generate_interactive_story, generate_conclusion, rewrite_story
+
+
+aai.settings.api_key = st.secrets["ASSEMBLY_API_KEY"]
+transcriber = aai.Transcriber()
+config = aai.TranscriptionConfig()
 
 # Set page configuration
 st.set_page_config(
-    page_title="Interactive Story Adventure",
+    page_title="VisualQuest - The Interactive Story Adventure",
     page_icon="📖",
     layout="wide"
 )
@@ -21,123 +26,6 @@ if 'choice_count' not in st.session_state:  # Add choice counter
     st.session_state.choice_count = 0
 if 'choice_limit' not in st.session_state:
     st.session_state.choice_limit = 5
-
-# Get API key from secrets
-samba = st.secrets["SAMBA_API_KEY"]
-
-# Initialize OpenAI client
-client = openai.OpenAI(
-    api_key=samba,
-    base_url="https://api.sambanova.ai/v1",
-)
-
-def encode_image_to_base64(image_file):
-    """Convert uploaded image to base64 string"""
-    if image_file is not None:
-        bytes_data = image_file.getvalue()
-        base64_string = base64.b64encode(bytes_data).decode('utf-8')
-        return base64_string
-    return None
-
-def analyze_image(image_base64):
-    """Analyze the image using Vision Model"""
-    image_prompt = """
-    You have been provided with an image submitted by a user. Your task is to analyze and describe the image, providing as much detail as possible about its content, composition, and overall aesthetic.
-
-    Image Description: Provide a brief summary of the image's content, including any notable objects, scenes, or figures.
-
-    Composition Analysis: Analyze the image's composition, discussing the use of:
-    Color palette and color harmony
-    Lighting and shadows
-    Negative space and composition balance
-
-    Aesthetic Analysis: Discuss the image's overall aesthetic, including:
-    Mood and atmosphere
-    Emotional resonance
-    Style and genre (e.g., realistic, abstract, surreal)
-    """
-    try:
-        response = client.chat.completions.create(
-            model='Llama-3.2-90B-Vision-Instruct',
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": image_prompt
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{image_base64}"
-                            }
-                        }
-                    ]
-                }
-            ]
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        return f"Error analyzing image: {str(e)}"
-
-def generate_interactive_story(context):
-    """Generate an interactive story based on image context"""
-    try:
-        prompt = f"""Create an interactive, branching narrative based on this story: {context}.
-        
-        Requirements:
-        - Generate a story segment of 3-4 paragraphs
-        - Make sure it is engaging, descriptive, and immersive, using vivid language and sensory details to bring it to life. 
-        - Use a narrative voice that is engaging, with a tone that is exciting and suspenseful.
-        - Provide exactly 3 distinct choices for the user to progress the story
-        - Each choice should lead to a different potential narrative path
-        - Maintain narrative coherence with previous choices if provided
-
-        Output Format:
-        [Story Segment]
-        
-        CHOICES:
-        1. [First Choice Description]
-        2. [Second Choice Description]
-        3. [Third Choice Description]
-        """
-
-        response = client.chat.completions.create(
-            model='Meta-Llama-3.2-3B-Instruct',
-            messages=[
-                {
-                    "role": "system",
-                    "content": prompt
-                }
-            ]
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        return f"Error generating interactive story: {str(e)}"
-
-def generate_conclusion(context):
-    """Generate the conclusion of the story based on context"""
-    try:
-        prompt = f"""Create a satisfactory conclusion to the story based on the context.
-                    Make sure it is engaging, descriptive, and immersive, using vivid language and sensory details to bring it to life. 
-                    Use a narrative voice that is engaging, with a tone that is exciting and suspenseful.
-                    At the end thank the user for engaging with the story.
-                    Context: {context}
-        """
-
-        response = client.chat.completions.create(
-            model='Meta-Llama-3.2-3B-Instruct',
-            messages=[
-                {
-                    "role": "system",
-                    "content": prompt
-                }
-            ]
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        return f"Error generating conclusion: {str(e)}"
 
 # Main Streamlit App
 st.title("📖 Interactive Story Adventure")
@@ -164,8 +52,8 @@ if uploaded_file is not None:
     
     choice_limit = st.sidebar.number_input(
     "Number of choices in your adventure:",
-    min_value=1,
-    max_value=20,
+    min_value=2,
+    max_value=10,
     value=st.session_state.choice_limit,
     step=1,
     help="Choose how many decisions you want to make in your adventure (1-20)"
@@ -173,6 +61,7 @@ if uploaded_file is not None:
     
     if choice_limit != st.session_state.choice_limit:
         st.session_state.choice_limit = choice_limit
+
 
     # Start Adventure Button
     if st.sidebar.button("Create your story! ✨") and not st.session_state.story_history:
@@ -186,12 +75,13 @@ if uploaded_file is not None:
         image_context = analyze_image(image_base64)
         
         # Generate first story segment
-        first_story = generate_interactive_story(image_context)
+        first_story = generate_interactive_story(context=image_context)
+        first_story_rewrite = rewrite_story(context=first_story)
         
         # Update session state
-        st.session_state.story_history.append(first_story)
-        st.session_state.current_story_state = first_story
-
+        st.session_state.story_history.append(first_story_rewrite)
+        st.session_state.current_story_state = first_story_rewrite
+        
 with story_container:
     if st.session_state.story_history:
         # Show story history
@@ -202,26 +92,37 @@ with story_container:
         # Only show input if we haven't reached the choices yet
         if st.session_state.choice_count < choice_limit:
             st.subheader("What will you do?")
-            user_input = st.text_input("Enter your decision:", key="user_choice_input")
+            audio_value = st.audio_input("Speak out your next move!")
             continue_button = st.button("Continue Your Journey")
 
-            if continue_button and user_input.strip():
+            if continue_button and audio_value:
+
+                audio_file = audio_value
+                transcript = transcriber.transcribe(audio_file, config)
+
+                if transcript.status == aai.TranscriptStatus.error:
+                    print(f"Transcription failed: {transcript.error}")
+                    exit(1)
+
                 # Increment choice counter
                 st.session_state.choice_count += 1
                 
                 # Append user input to story history
-                st.session_state.story_history.append(f"**Your decision:** {user_input.strip()}")
+                st.session_state.story_history.append(f"**Your decision:** {transcript.text}")
                 
                 # Generate next story segment or conclusion based on choice count
                 if st.session_state.choice_count < choice_limit:
-                    next_story = generate_interactive_story(context=user_input.strip())
+                    next_story = generate_interactive_story(context=transcript.text)
+                    next_story_rewrite = rewrite_story(context=next_story)
                 else:
-                    next_story = generate_conclusion(context=user_input.strip())
+                    next_story = generate_conclusion(context=transcript.text)
+                    next_story_rewrite = rewrite_story(context=next_story)
+
                     st.success("🎉 Congratulations! You've reached the end of your adventure!")
                 
                 # Update session state
-                st.session_state.story_history.append(next_story)
-                st.session_state.current_story_state = next_story
+                st.session_state.story_history.append(next_story_rewrite)
+                st.session_state.current_story_state = next_story_rewrite
                 
                 # Rerun app to update display
                 st.rerun()
