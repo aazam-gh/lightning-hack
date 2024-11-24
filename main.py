@@ -28,7 +28,7 @@ if 'choice_limit' not in st.session_state:
     st.session_state.choice_limit = 5
 
 # Main Streamlit App
-st.title("📖 Interactive Story Adventure")
+st.title("📖 VisualQuest - Interactive Story Adventure")
 
 # Sidebar for story controls
 st.sidebar.header("Story Adventure")
@@ -115,8 +115,7 @@ with story_container:
                     next_story = generate_interactive_story(context=transcript.text)
                     next_story_rewrite = rewrite_story(context=next_story)
                 else:
-                    next_story = generate_conclusion(context=transcript.text)
-                    next_story_rewrite = rewrite_story(context=next_story)
+                    next_story_rewrite = generate_conclusion(context=transcript.text)
 
                     st.success("🎉 Congratulations! You've reached the end of your adventure!")
                 

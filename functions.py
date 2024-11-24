@@ -72,9 +72,6 @@ def generate_interactive_story(context):
         
         Requirements:
         - Generate a story segment of 3-4 paragraphs
-        - Make sure it is engaging, descriptive, and immersive, using vivid language and sensory details to bring it to life. 
-        - Use a narrative voice that is engaging, with a tone that is exciting and suspenseful.
-
         Output Format:
         [Story Segment]
         
@@ -99,7 +96,7 @@ def rewrite_story(context):
     """Generate an interactive story based on image context"""
     try:
         prompt = f"""Rewrite this with the given requirements: {context}.
-        
+
         Requirements:
         - Make sure it is engaging, descriptive, and immersive, using vivid language and sensory details to bring it to life. 
         - Use a narrative voice that is engaging, with a tone that is exciting and suspenseful.
